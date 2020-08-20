@@ -1,0 +1,24 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>COVID Historical Data by County</title>
+  <meta name="description" content="COVID Historical Data by County">
+  <meta name="author" content="yagni">
+
+  <link rel="stylesheet" type="text/css" href="css/styles.css">
+
+</head>
+
+<body onload="loadCounties()">
+  <script data-require="d3@4.0.0" data-semver="4.0.0" src="https://d3js.org/d3.v4.min.js"></script>
+  <script src="https://d3js.org/d3-dsv.v1.min.js"></script>
+  <script src="https://d3js.org/d3-fetch.v1.min.js"></script>
+  <script src="js/scripts.js"></script>
+  <div id="counties"></div>
+  <button onclick="onAddClicked()">Add county</button>  <button onclick="onClear()">Clear</button><br>
+  <svg id="chart" width="850" height="410"></svg>
+</body>
+</html>
