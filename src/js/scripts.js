@@ -25,12 +25,29 @@ function addNewData(countyName, incomingCountyData) {
     window.loadedCountyData = window.loadedCountyData.map(row => extractKeys(row, keys));
 }
 
+function sortFunc() {
+    return (a, b) => (a.name < b.name) ? -1 : (a.name > b.name) ? 1 : 0;
+}
+
+function queryAPI(query) {
+    return fetch('https://covid-nyt-api.now.sh/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({operationName: null, query, variables:{}})
+    })
+    .then(response => response.json());
+}
+
 function loadCounties() {
-    fetch('../data/counties.json')
-        .then(response => response.json())
-        .then(json => {
-            window.stateCounties = json;
-        });
+    queryAPI("{states{name counties{name,fips,population}}}")
+    .then(json => {
+        window.stateCounties = {};
+        json.data.states.sort(sortFunc);
+        for (const state of json.data.states) {
+            window.stateCounties[state.name] = state.counties.sort(sortFunc);
+        }
+        onAddClicked();
+    });
 }
 
 function createCountyControls(index) {
@@ -79,7 +96,7 @@ function onStateChanged(select) {
     const counties = window.stateCounties[select.value];
     countySelect.add(new Option("--Select county--"))
     for (const county in counties)
-        countySelect.add(new Option(counties[county]));
+        countySelect.add(new Option(counties[county].name, counties[county].fips));
     
     countySelect.disabled = false;
 }
@@ -367,12 +384,15 @@ function loadCounty(countyComponent) {
     }
     const index = +countyComponent.id.slice(6);
     const state = document.getElementById(`state${index}`).value;
-    const county = countyComponent.value;
-    d3.dsv(",", `../data/counties/${county} - ${state}.json`, function(d) {
-        return {
-            date: new Date(d.date),
-            cases: +d.cases,
-            deaths: +d.deaths
-        };
-    }).then(data => addNewData(`${county}, ${state}`, movingAvg(data, 7))).then(() => drawChart(window.loadedCountyData));
+    const countyName = countyComponent.selectedOptions[0].text;
+    const fips = countyComponent.selectedOptions[0].value;
+    queryAPI(`{counties(fips: "${fips}"){timeline{date cases}}}`)
+    .then(json => {
+        const points = json.data.counties[0].timeline;
+        points.reverse();
+        return points.map((point, index) => ({
+            date: new Date(point.date),
+            cases: (index === 0) ? point.cases : Math.max(0, point.cases - points[index - 1].cases)
+        }));
+    }).then(data => addNewData(`${countyName}, ${state}`, movingAvg(data, 7))).then(() => drawChart(window.loadedCountyData));
 }
