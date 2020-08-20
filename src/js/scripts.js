@@ -1,6 +1,13 @@
 window.numberCounties = 0;
 window.loadedCountyData = [];
 
+function extractKeys(obj, keys) {
+    return keys.reduce( (current, key) => {
+        current[key] = obj[key];
+        return current;
+    }, {});
+}
+
 function addNewData(countyName, incomingCountyData) {
     for (const incomingRow of incomingCountyData) {
         const indexOfRowToInsertBefore = window.loadedCountyData.findIndex((existing) => existing.date >= incomingRow.date);
@@ -14,6 +21,8 @@ function addNewData(countyName, incomingCountyData) {
                 window.loadedCountyData.splice(indexOfRowToInsertBefore, 0, { date: incomingRow.date, [countyName]: incomingRow.cases });
         }
     }
+    var keys = getSelectedCounties().concat(['date']);
+    window.loadedCountyData = window.loadedCountyData.map(row => extractKeys(row, keys));
 }
 
 function loadCounties() {
@@ -36,7 +45,7 @@ function onAddClicked() {
     wrapper.innerHTML = createCountyControls(index);
     container.appendChild(wrapper);
     const stateComponent = document.getElementById(`state${index}`);
-    stateComponent.add(new Option("--Select one--"))
+    stateComponent.add(new Option("--Select state--"))
     Object.keys(window.stateCounties).sort().forEach(state => stateComponent.add(new Option(state)));
 }
 
@@ -44,18 +53,22 @@ function getCountiesDiv() {
     return document.getElementById("counties");
 }
 
+function clearChart() {
+    document.getElementById("chart").innerHTML = "";
+}
+
 function onClear() {
     window.numberCounties = 0;
     window.loadedCountyData = [];
     getCountiesDiv().innerHTML = "";
-    document.getElementById("chart").innerHTML = "";
+    clearChart();
 }
 
 function onStateChanged(select) {
     const index = +select.id.slice(5);
     const countySelect = document.getElementById(`county${index}`);
 
-    if (select.value[0] === '-') { // --Select one--
+    if (select.value[0] === '-') { // --Select state--
         countySelect.disabled = true;
         return;
     }
@@ -64,6 +77,7 @@ function onStateChanged(select) {
         countySelect.remove(0);
 
     const counties = window.stateCounties[select.value];
+    countySelect.add(new Option("--Select county--"))
     for (const county in counties)
         countySelect.add(new Option(counties[county]));
     
@@ -258,7 +272,7 @@ function drawChart(data) {
 				.text(formatDate(d.date));
 
 			focus.selectAll(".hoverCircle")
-				.attr("cy", e => y(d[e]))
+				.attr("cy", e => y(d[e] || 0))
 				.attr("cx", x(d.date));
 
 			focus.selectAll(".lineHoverText")
@@ -348,6 +362,9 @@ function drawChart(data) {
 }
 
 function loadCounty(countyComponent) {
+    if (countyComponent.value[0] === '-') { // --Select county--
+        return;
+    }
     const index = +countyComponent.id.slice(6);
     const state = document.getElementById(`state${index}`).value;
     const county = countyComponent.value;
