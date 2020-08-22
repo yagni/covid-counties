@@ -1,4 +1,5 @@
 window.numberCounties = 0;
+window.displayPerCapita = false;
 window.loadedCountyData = [];
 
 function extractKeys(obj, keys) {
@@ -49,6 +50,12 @@ function onAddClicked() {
     Object.keys(window.stateCounties).sort().forEach(state => stateComponent.add(new Option(state)));
 }
 
+function onPerCapitaChanged(element) {
+    window.displayPerCapita = element.checked;
+    clearChart();
+    drawChart(window.loadedCountyData);
+}
+
 function getCountiesDiv() {
     return document.getElementById("counties");
 }
@@ -79,7 +86,7 @@ function onStateChanged(select) {
     const counties = window.stateCounties[select.value];
     countySelect.add(new Option("--Select county--"))
     for (const county in counties)
-        countySelect.add(new Option(counties[county]));
+        countySelect.add(new Option(counties[county].name));
     
     countySelect.disabled = false;
 }
@@ -89,8 +96,9 @@ function movingAvg (data, neighbors) {
     return data.map((val, idx, arr) => {
       let start = Math.max(0, idx - neighbors), end = idx + neighbors;
       let subset = arr.slice(start, end + 1);
-      let sum = subset.reduce((a,b) => a + b.cases, 0);
-      return {date: val.date, cases: sum / subset.length};
+      let rawSum = subset.reduce((a,b) => a + b.cases.raw, 0);
+      let perCapitaSum = subset.reduce((a,b) => a + b.cases.perCapita, 0);
+      return {date: val.date, cases: { raw: rawSum / subset.length, perCapita: perCapitaSum / subset.length } };
     })
   }
 
@@ -121,6 +129,10 @@ function getSelectedCounties() {
     return counties;
 }
 
+function getCases(d) {
+    return (d && (window.displayPerCapita ? d.perCapita : d.raw)) || 0;
+}
+
 // Based on https://bl.ocks.org/LemoNode/a9dc1a454fdc80ff2a738a9990935e9d
 function drawChart(data) {
     var keys = getSelectedCounties();
@@ -145,7 +157,7 @@ function drawChart(data) {
 	var line = d3.line()
 		.curve(d3.curveCardinal)
 		.x(d => x(d.date))
-        .y(d => y(d.cases));
+        .y(d => y(getCases(d.cases)));
         
     if (document.getElementById('chart').innerHTML === '') { // on create
         svg.append("g")
@@ -200,13 +212,13 @@ function drawChart(data) {
 		var counties = copy.map(function(id) {
 			return {
 				id: id,
-				values: data.map(d => {return {date: d.date, cases: +(d[id] || 0)}})
+				values: data.map(d => {return {date: d.date, cases: (d[id] || {raw: 0, perCapita: 0})}})
 			};
 		});
 
 		y.domain([
-			d3.min(counties, d => d3.min(d.values, c => c.cases)),
-			d3.max(counties, d => d3.max(d.values, c => c.cases))
+			d3.min(counties, d => d3.min(d.values, c => getCases(c.cases))),
+			d3.max(counties, d => d3.max(d.values, c => getCases(c.cases)))
 		]).nice();
 
 		svg.selectAll(".y-axis").transition()
@@ -272,13 +284,13 @@ function drawChart(data) {
 				.text(formatDate(d.date));
 
 			focus.selectAll(".hoverCircle")
-				.attr("cy", e => y(d[e] || 0))
+				.attr("cy", e => y(getCases(d[e])))
 				.attr("cx", x(d.date));
 
 			focus.selectAll(".lineHoverText")
 				.attr("transform", 
 					"translate(" + (x(d.date)) + "," + height / 2.5 + ")")
-				.text(e => e + " " + formatValue(d[e] || 0) + " cases");
+				.text(e => e + " " + formatValue(getCases(d[e])) + ` cases${window.displayPerCapita ? ' per 100,000' : ''}`);
 
 			x(d.date) > (width - width / 4) 
 				? focus.selectAll("text.lineHoverText")
@@ -368,10 +380,12 @@ function loadCounty(countyComponent) {
     const index = +countyComponent.id.slice(6);
     const state = document.getElementById(`state${index}`).value;
     const county = countyComponent.value;
+    const population = window.stateCounties[state].find(stateCounty => stateCounty.name === county).population;
     d3.dsv(",", `../data/counties/${county} - ${state}.json`, function(d) {
+        const cases = +d.cases;
         return {
             date: new Date(d.date),
-            cases: +d.cases,
+            cases: { raw: cases, perCapita: (population === undefined) ? 0 : ((cases * 100000) / population) },
             deaths: +d.deaths
         };
     }).then(data => addNewData(`${county}, ${state}`, movingAvg(data, 7))).then(() => drawChart(window.loadedCountyData));

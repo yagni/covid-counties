@@ -21,15 +21,26 @@ function downloadJSON(url) {
     });
 }
 
+function readPopulations(fs) {
+    const data = fs.readFileSync('data/population.csv', 'utf8');
+
+    const rows = data.split('\n').slice(1);
+    const countyPopulations = {};
+    for (const row of rows) {
+        const [state, county, population] = row.split('\t');
+        countyPopulations[`${county} - ${state}`] = +population;
+    }
+    return countyPopulations;
+}
 
 async function main() {
     //const data = await downloadJSON('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv');
     //console.log(data.length);
 
     const fs = require('fs');
-    //fs.writeFile('data/output.json', data, (err) => { if (err) console.log(err) });
+    //fs.writeFile('data/nytimes_counties.csv', data, (err) => { if (err) console.log(err) });
 
-    const data = fs.readFileSync('data/output.json', 'utf8');
+    const data = fs.readFileSync('data/nytimes_counties.csv', 'utf8');
 
     const rows = data.split('\n').slice(1);
     const counties = {};
@@ -46,14 +57,15 @@ async function main() {
 main();
 
 function writeCounties(fs, counties) {
+    const countyPopulations = readPopulations(fs);
     const stateCounties = {};
     for (const fullCounty of Object.keys(counties)) {
         const [county, state] = fullCounty.split(' - ');
         stateCounties[state] = (stateCounties[state] || []);
-        stateCounties[state].push(county);
+        stateCounties[state].push({name: county, population: countyPopulations[fullCounty]});
     }
     for (const state in stateCounties)
-        stateCounties[state].sort();
+        stateCounties[state].sort((a,b) => (a.name < b.name) ? -1 : (a.name > b.name) ? 1 : 0);
     fs.writeFile(`data/counties.json`, JSON.stringify(stateCounties), (err) => {
         if (err) console.log(err);
     });
