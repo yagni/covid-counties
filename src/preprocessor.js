@@ -34,13 +34,13 @@ function readPopulations(fs) {
 }
 
 async function main() {
-    //const data = await downloadJSON('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv');
+    const data = await downloadJSON('https://raw.githubusercontent.com/nytimes/covid-19-data/master/us-counties.csv');
     //console.log(data.length);
 
     const fs = require('fs');
     //fs.writeFile('data/nytimes_counties.csv', data, (err) => { if (err) console.log(err) });
 
-    const data = fs.readFileSync('data/nytimes_counties.csv', 'utf8');
+    //const data = fs.readFileSync('data/nytimes_counties.csv', 'utf8');
 
     const rows = data.split('\n').slice(1);
     const counties = {};
