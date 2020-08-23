@@ -1,6 +1,7 @@
 window.numberCounties = 0;
 window.displayPerCapita = false;
 window.loadedCountyData = [];
+window.toolTipX = undefined;
 
 function extractKeys(obj, keys) {
     return keys.reduce( (current, key) => {
@@ -67,6 +68,7 @@ function clearChart() {
 function onClear() {
     window.numberCounties = 0;
     window.loadedCountyData = [];
+    window.toolTipX = undefined;
     getCountiesDiv().innerHTML = "";
     clearChart();
 }
@@ -203,7 +205,12 @@ function drawChart(data) {
 		.attr("width", width - margin.right - margin.left)
 		.attr("height", height);
 
-	update(0);
+    update(0);
+
+    if (window.toolTipX === undefined)
+        window.toolTipX = document.getElementById('chart').getBoundingClientRect().width / 2;
+  
+    internalMouseMove(window.toolTipX);
 
 	function update(speed) {
 
@@ -263,44 +270,48 @@ function drawChart(data) {
 			.merge(circles);
 
 		svg.selectAll(".overlay")
-			.on("mouseover", function() { focus.style("display", null); })
-			.on("mouseout", function() { focus.style("display", "none"); })
-			.on("mousemove", mousemove);
+            .on("mousemove", mousemove);
+    }
+    
+    function internalMouseMove(xPosition) {
+        window.toolTipX = xPosition;
+        focus.style("display", null);
 
-		function mousemove() {
+        var x0 = x.invert(xPosition),
+            i = bisectDate(data, x0, 1),
+            d0 = data[i - 1],
+            d1 = data[i],
+            d = x0 - d0.date > d1.date - x0 ? d1 : d0;
 
-			var x0 = x.invert(d3.mouse(this)[0]),
-				i = bisectDate(data, x0, 1),
-				d0 = data[i - 1],
-				d1 = data[i],
-				d = x0 - d0.date > d1.date - x0 ? d1 : d0;
+        focus.select(".lineHover")
+            .attr("transform", "translate(" + x(d.date) + "," + height + ")");
 
-			focus.select(".lineHover")
-				.attr("transform", "translate(" + x(d.date) + "," + height + ")");
+        focus.select(".lineHoverDate")
+            .attr("transform", 
+                "translate(" + x(d.date) + "," + (height + margin.bottom) + ")")
+            .text(formatDate(d.date));
 
-			focus.select(".lineHoverDate")
-				.attr("transform", 
-					"translate(" + x(d.date) + "," + (height + margin.bottom) + ")")
-				.text(formatDate(d.date));
+        focus.selectAll(".hoverCircle")
+            .attr("cy", e => y(getCases(d[e])))
+            .attr("cx", x(d.date));
 
-			focus.selectAll(".hoverCircle")
-				.attr("cy", e => y(getCases(d[e])))
-				.attr("cx", x(d.date));
+        focus.selectAll(".lineHoverText")
+            .attr("transform", 
+                "translate(" + (x(d.date)) + "," + height / 2.5 + ")")
+            .text(e => e + " " + formatValue(getCases(d[e])) + ` cases${window.displayPerCapita ? ' per 100,000' : ''}`);
 
-			focus.selectAll(".lineHoverText")
-				.attr("transform", 
-					"translate(" + (x(d.date)) + "," + height / 2.5 + ")")
-				.text(e => e + " " + formatValue(getCases(d[e])) + ` cases${window.displayPerCapita ? ' per 100,000' : ''}`);
+        x(d.date) > (width - width / 4) 
+            ? focus.selectAll("text.lineHoverText")
+                .attr("text-anchor", "end")
+                .attr("dx", -10)
+            : focus.selectAll("text.lineHoverText")
+                .attr("text-anchor", "start")
+                .attr("dx", 10)
+    }
 
-			x(d.date) > (width - width / 4) 
-				? focus.selectAll("text.lineHoverText")
-					.attr("text-anchor", "end")
-					.attr("dx", -10)
-				: focus.selectAll("text.lineHoverText")
-					.attr("text-anchor", "start")
-					.attr("dx", 10)
-		}
-	}
+    function mousemove() {
+        internalMouseMove(d3.mouse(this)[0]);
+    }
 
 /*
     var w = 1200,
