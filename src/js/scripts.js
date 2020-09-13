@@ -96,7 +96,7 @@ function onStateChanged(select) {
 // from https://stackoverflow.com/a/41387286/80525
 function movingAvg (data, neighbors) {
     return data.map((val, idx, arr) => {
-      let start = Math.max(0, idx - neighbors), end = idx + neighbors;
+      let start = Math.max(0, idx - neighbors), end = idx;
       let subset = arr.slice(start, end + 1);
       let rawSum = subset.reduce((a,b) => a + b.cases.raw, 0);
       let perCapitaSum = subset.reduce((a,b) => a + b.cases.perCapita, 0);
@@ -394,10 +394,11 @@ function loadCounty(countyComponent) {
     const population = window.stateCounties[state].find(stateCounty => stateCounty.name === county).population;
     d3.dsv(",", `../data/counties/${county} - ${state}.json`, function(d) {
         const cases = +d.cases;
+        const [year, month, day] = d.date.split('-');
         return {
-            date: new Date(d.date),
+            date: new Date(+year, +month - 1, +day),
             cases: { raw: cases, perCapita: (population === undefined) ? 0 : ((cases * 100000) / population) },
             deaths: +d.deaths
         };
-    }).then(data => addNewData(`${county}, ${state}`, movingAvg(data, 7))).then(() => drawChart(window.loadedCountyData));
+    }).then(data => addNewData(`${county}, ${state}`, movingAvg(data, 6))).then(() => drawChart(window.loadedCountyData));
 }
