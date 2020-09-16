@@ -50,8 +50,11 @@ async function main() {
         counties[key] = (counties[key] || []);
         counties[key].push(row);
     }
+/*
     writeCountyData(fs, counties);
     writeCounties(fs, counties);
+*/
+    writeAllCasesAsDailyNewMovingAverage(fs, counties);
 }
 
 main();
@@ -94,3 +97,40 @@ function writeCountyData(fs, counties) {
         });
     }
 }
+
+const CASES_INDEX = 4;
+
+function writeAllCasesAsDailyNewMovingAverage(fs, counties) {
+    let outRows = ['date,county,state,fips,cases,deaths'];
+    for (const county in counties) {
+        counties[county].sort();
+        outRows = outRows.concat(movingAvg(getRowsAsSplitNewDailyCases(counties[county]), 6).map(row => row.join(',')));
+    }
+    fs.writeFile(`data/dailyNewCasesMovingAvg.csv`, outRows.join('\n'), (err) => {
+        if (err) console.log(err);
+    });
+}
+
+function getRowsAsSplitNewDailyCases(rows) {
+    const splitRows = rows.map(row => row.split(','));
+    return splitRows.map((row, i) => {
+        const currentRow = Array.from(row);
+        if (i > 0) {
+            const prevCases = splitRows[i - 1][CASES_INDEX];
+            currentRow[CASES_INDEX] = Math.max(0, +currentRow[CASES_INDEX] - prevCases);
+        } else
+            currentRow[CASES_INDEX] = +currentRow[CASES_INDEX];
+        return currentRow;
+    });
+}
+
+function movingAvg (rows, neighbors) {
+    return rows.map((row, idx) => {
+      let start = Math.max(0, idx - neighbors), end = idx;
+      let subset = rows.slice(start, end + 1);
+      let sum = subset.reduce((a,b) => a + b[CASES_INDEX], 0);
+      const result = Array.from(row);
+      result[CASES_INDEX] = sum / subset.length;
+      return result;
+    });
+  }
